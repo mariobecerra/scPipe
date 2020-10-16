@@ -1,4 +1,3 @@
-
 #include <Rcpp.h>
 #include "trimbarcode.h"
 #include "parsecount.h"
