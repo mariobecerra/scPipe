@@ -84,56 +84,6 @@ sc_atac_feature_counting <- function(
   }
   
   
-  # generate the GAlignments object for further use
-  
-  if(feature_type == 'peak'){ 
-    cat("`peak` feature_type is selected for feature input", "\n")
-    
-    if(fix_chr %in% c("feature", "both")){
-      
-      out_bed_filename_feature = paste0(output_folder, "/", sub('\\..[^\\.]*$', '', basename(feature_input)), ".bed") # remove extension and append output folder
-      
-      # Try to read first 5 rows of blacklist file to see if the format is correct
-      feature_head <- read.table(feature_input, nrows = 5)
-      if(ncol(feature_head) != 3){
-        warning("Feature file provided does not contain 3 columns. Cannot append chr.")
-        break
-      }
-      
-      
-      rcpp_append_chr_to_bed_file(feature_input, out_bed_filename_feature)
-      
-      # Check if file was created
-      if(file.exists(out_bed_filename_feature)) cat("Appended 'chr' to feature file and output created in:", out_bed_filename_feature, "\n")
-      else stop("File ", out_bed_filename_feature, "file was not created.")
-    }
-    
-  }
-  
-  
-  if(fix_chr %in% c("blacklist", "both")){
-    
-    out_bed_filename_blacklist = paste0(output_folder, "/", sub('\\..[^\\.]*$', '', basename(blacklist)), ".bed") # remove extension and append output folder
-    
-    # Try to read first 5 rows of blacklist file to see if the format is correct
-    blacklist_head <- read.table(blacklist, nrows = 5)
-    if(ncol(blacklist_head) != 3){
-      warning("Blacklist file provided does not contain 3 columns. Cannot append chr.")
-      break
-    }
-    
-    rcpp_append_chr_to_bed_file(blacklist, out_bed_filename_blacklist)
-    
-    # Check if file was created
-    if(file.exists(out_bed_filename_blacklist)) cat("Appended 'chr' to blacklist file and output created in:", out_bed_filename_blacklist, "\n")
-    else stop("File ", out_bed_filename_blacklist, "file was not created.")
-    
-    
-  } # end if blacklist
-  
-  
-  
-  
   
   cat("Creating GAlignment object for the sorted BAM file...")
   #tags = "CB"
@@ -157,8 +107,79 @@ sc_atac_feature_counting <- function(
   
   feature.gr <- rtracklayer::import(feature_input)
   
+  ############################### fix_chr
+  
+  if(feature_type == 'peak'){
+    cat("`peak` feature_type is selected for feature input", "\n")
+    
+    if(fix_chr %in% c("feature", "both")){
+      
+      out_bed_filename_feature = paste0(output_folder, "/", sub('\\..[^\\.]*$', '', basename(feature_input)), "_fixedchr.tsv") # remove extension and append output folder
+      
+      # Try to read first 5 rows of blacklist file to see if the format is correct
+      feature_head <- read.table(feature_input, nrows = 5)
+      if(ncol(feature_head) != 3){
+        warning("Feature file provided does not contain 3 columns. Cannot append chr.")
+        break
+      }
+      
+      
+      rcpp_append_chr_to_bed_file(feature_input, out_bed_filename_feature)
+      
+      # Check if file was created
+      if(file.exists(out_bed_filename_feature)) cat("Appended 'chr' to feature file and output created in:", out_bed_filename_feature, "\n")
+      else stop("File ", out_bed_filename_feature, "file was not created.")
+    }
+    
+  }
+  
+  
+  if(fix_chr %in% c("blacklist", "both")){
+    
+    if(!is.null(blacklist)){
+      
+      out_bed_filename_blacklist = paste0(output_folder, "/", sub('\\..[^\\.]*$', '', basename(blacklist)), "_fixedchr.tsv") # remove extension and append output folder
+      
+      # Try to read first 5 rows of blacklist file to see if the format is correct
+      blacklist_head <- read.table(blacklist, nrows = 5)
+      if(ncol(blacklist_head) != 3){
+        warning("Blacklist file provided does not contain 3 columns. Cannot append chr.")
+        break
+      }
+      
+      rcpp_append_chr_to_bed_file(blacklist, out_bed_filename_blacklist)
+      
+      # Check if file was created
+      if(file.exists(out_bed_filename_blacklist)) cat("Appended 'chr' to blacklist file and output created in:", out_bed_filename_blacklist, "\n")
+      else stop("File ", out_bed_filename_blacklist, "file was not created.")
+      
+    }
+    
+  } # end if blacklist
+  
+  ############################### end fix_chr
+  
   # ______________ need to add the blacklist filtering here , relevent param has been added to the function i.e. blacklist.
   # this param should take either a tab delimited file in the format of feature_input or keywords "hs", "mm" which would load a stored GAlignment file related to them
+  
+  number_of_lines_to_remove = 0
+  if(!is.null(blacklist)){
+    blacklist.gr = rtracklayer::import(blacklist)
+    
+    overlaps_blacklist_feature = findOverlaps(blacklist.gr, feature.gr, maxgap = -1L, minoverlap = 0L) # Find overlaps
+    lines_to_remove = as.data.frame(overlaps_blacklist_feature)$subjectHits # Lines to remove in feature file
+    number_of_lines_to_remove = length(lines_to_remove)
+    
+    if(number_of_lines_to_remove > 0){ # If there are lines to remove
+      feature.gr.df = as.data.frame(feature.gr)
+      lines_to_keep = setdiff(1:nrow(feature.gr.df), lines_to_remove)
+      feature.gr = feature.gr[lines_to_keep, ]
+    }
+    
+    
+  }
+  
+  
   
   overlaps <- findOverlaps( query = yld.gr, subject = feature.gr, type = "within", minoverlap = 0, ignore.strand = TRUE)
   
