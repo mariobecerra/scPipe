@@ -38,10 +38,15 @@ sc_atac_aligning <- function (ref, readFile1, readFile2=NULL, readDir = NULL, ou
   
   #execute Rsubread align()
   Rsubread::align(index=indexPath,readfile1=readFile1,readfile2=readFile2, output_file=outbam)
-  
+  Rsamtools::sortBam(outbam, paste0(fileNameWithoutExtension, "_aligned"))
   Rsamtools::indexBam(outbam)
   
   # get the unmapped mapped stats to be output and stored in a log file
   #can use Rsamtools::idxstatsBam()
   
 } 
+
+
+
+
+
