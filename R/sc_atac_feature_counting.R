@@ -96,6 +96,7 @@ sc_atac_feature_counting <- function(
   yld    <- GenomicAlignments::readGAlignments(bamfl,use.names = TRUE, param = param)
   yld.gr <- makeGRangesFromDataFrame(yld,keep.extra.columns=TRUE) 
   #yld.gr <- as(GRanges(yld), "GAlignments")
+  average_number_of_lines_per_CB = length(yld.gr$CB)/length(unique(yld.gr$CB))
   
   # ______________ get the average lines per CB (average reads per cell barcode) here for the GAlignment object
   
@@ -180,8 +181,9 @@ sc_atac_feature_counting <- function(
   }
   
   
-  
-  overlaps <- findOverlaps( query = yld.gr, subject = feature.gr, type = "within", minoverlap = 0, ignore.strand = TRUE)
+  median_feature_overlap = median(ranges(feature.gr)@width)
+  minoverlap = 0.9*median_feature_overlap
+  overlaps <- findOverlaps( query = yld.gr, subject = feature.gr, type = "within", minoverlap = minoverlap, ignore.strand = TRUE)
   
   # generate the matrix using this overlap results above.
   
