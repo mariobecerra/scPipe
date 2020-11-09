@@ -180,7 +180,17 @@ sc_atac_feature_counting <- function(
     
   }
   
+  # Log file
+  log_file_name = paste0(output_folder, "/log_file.txt")
+  file.create(log_file_name)
   
+  cat("Average number of lines per CB:", average_number_of_lines_per_CB, "\n", 
+      file = log_file_name, append = T)
+  
+  cat("Number of regions removed from feature_input were removed:", number_of_lines_to_remove, "\n", 
+      file = log_file_name, append = T)
+  
+  # Overlaps
   median_feature_overlap = median(ranges(feature.gr)@width)
   minoverlap = 0.9*median_feature_overlap
   overlaps <- findOverlaps( query = yld.gr, subject = feature.gr, type = "within", minoverlap = minoverlap, ignore.strand = TRUE)
