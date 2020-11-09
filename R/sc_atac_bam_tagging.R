@@ -11,20 +11,32 @@
 #' @export
 #'
 
-sc_atac_bam_tagging = function(inbam, outbam="",
+sc_atac_bam_tagging = function(inbam, outfolder = "",
                                bam_tags = list(bc="CB", mb="OX"),
                                nthreads=1) {
   
   if (any(!file.exists(inbam))) {
     stop("At least one input bam file should be present")
   } else {
+    cat("sc_atac_bam_tagging1\n")
     inbam = path.expand(inbam)
   }
   
-  if(outbam == ""){
+  
+  if(outfolder == ""){
     fileNameWithoutExtension <- strsplit(inbam, "\\.")[[1]][1]
     outbam                   <- paste(fileNameWithoutExtension, "_tagged.bam", sep = "")
     outsortedbam             <- paste(fileNameWithoutExtension, "_sorted", sep = "")
+  } else{
+    if(!dir.exists(outfolder)){
+      cat(outfolder, "does not exist.\nCreating folder...")
+      dir.create(outfolder)
+      cat("Created.\n")
+    }
+    
+    fileNameWithoutExtension <- basename(strsplit(inbam, "\\.")[[1]][1])
+    outbam                   <- paste(outfolder, "/", fileNameWithoutExtension, "_tagged.bam", sep = "")
+    outsortedbam             <- paste(outfolder, "/", fileNameWithoutExtension, "_sorted", sep = "")
   }
   
   outbam <- path.expand(outbam)
@@ -47,15 +59,14 @@ sc_atac_bam_tagging = function(inbam, outbam="",
   cat("Output Tagged Bam File Location:")
   cat(outbam)
   cat("\n")
-
+  
   
   sf <- sortBam(outbam,outsortedbam, indexDestination=TRUE)
   
   cat("Output Sorted & Indexed Bam File Location:")
   cat(outsortedbam)
   cat("\n")
-  
-  # generate the fragment file for the BAM file
+  # generate the fragment file for the BAM file 
   # need bedtools v2.26.0 or later
-  #system2("bedtools", c("bamToBed", "i", outsortedbam), "|", "awk", c(-F"#" '{print $1"\t"$2}'), stdout = paste(output_folder,"/fragments.bed",sep = ""))
+  # system2("bedtools", c("bamToBed", "i", outsortedbam), "|", "awk", c(-F"#" '{print $1"\t"$2}'), stdout = paste(output_folder,"/fragments.bed",sep = ""))
 }
