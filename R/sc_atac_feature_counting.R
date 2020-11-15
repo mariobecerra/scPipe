@@ -1,16 +1,3 @@
-#' sc_atac_feature_counting()
-#'
-#' @return 
-#'
-#' @examples
-#' \dontrun{
-#' 
-#' 
-#' }
-#'
-#' @export
-#'
-
 library(rtracklayer)
 library(GenomicAlignments)
 library(Rsamtools)
@@ -25,6 +12,14 @@ library(IRanges)
 library(S4Vectors)
 library(BiocGenerics)  
 
+
+
+
+
+
+
+
+
 #' TODO: documentation
 #'
 #' @export
@@ -34,6 +29,10 @@ sc_atac_feature_counting <- function(
   feature_input, 
   bam_tags = list(bc="CB", mb="OX"), 
   feature_type = "peak", 
+  organism = NULL,
+  cell_calling = "cellranger", # either c("cellranger", "emptydrops", "filter")
+  genome_size = NULL, # this is optional but needed if the cell_calling option is cellranger AND organism in NULL
+  qc_per_bc_file = NULL, # this is optional but needed if the cell_calling option is cellranger
   bin_size = NULL, 
   yieldsize = 1000000,
   mapq = 0,
@@ -53,7 +52,7 @@ sc_atac_feature_counting <- function(
     cat("Output Directory Does Not Exist. Created Directory: ", output_folder, "\n")
   }
   
-  if(feature_type == 'genome_bin'){ 
+  if(feature_type == 'genome_bin'){
     # TODO: test the format of the fasta file here and stop if not proper format
     cat("`genome bin` feature type is selected for feature input. reading the genome fasta file ...", "\n")
     
@@ -205,35 +204,52 @@ sc_atac_feature_counting <- function(
   mcols(yld.gr)[queryHits(overlaps), "peakEnd"]   <- end(ranges(feature.gr)[subjectHits(overlaps)])
   
   
-  overlap.df <- data.frame(yld.gr) %>% select(seqnames, peakStart, peakEnd, CB)
-  matrixData <- overlap.df %>% group_by(seqnames, peakStart, peakEnd, CB) %>% summarise(count = n())
+  overlap.df <- data.frame(yld.gr) %>% dplyr::select(seqnames, peakStart, peakEnd, CB)
   
-  # generate the matrix format
-  names(matrixData) <- c("chromosome","start","end","barcode","count")
-  
-  matrixData <- matrixData %>%
+  matrixData <- overlap.df %>% 
+    dplyr::group_by(seqnames, peakStart, peakEnd, CB) %>% 
+    dplyr::summarise(count = n()) %>% 
+    purrr::set_names(c("chromosome","start","end","barcode","count")) %>% 
     unite("chrS", chromosome:start, sep=":") %>%
-    unite("feature", chrS:end, sep="-")
+    unite("feature", chrS:end, sep="-") %>% 
+    dplyr::group_by(feature,barcode) %>% 
+    dplyr::mutate(grouped_id = row_number()) %>% 
+    tidyr::spread(barcode, count) %>% 
+    dplyr::select(-grouped_id) %>% 
+    # TODO: sanity check to see if all features are unique here
+    #if(!unique(matrixData$feature)) {stop("There are duplicate values in the feature input. Please check and rerun this step again")}
+    as_tibble(rownames = "feature") %>% 
+    dplyr::select(-1)
   
-  matrixData <- matrixData %>% 
-    group_by(feature,barcode) %>% 
-    mutate(grouped_id = row_number())
-  
-  matrixData <- matrixData %>% 
-    spread(barcode, count) %>% 
-    select(-grouped_id)
-  
-  # TODO: sanity check to see if all features are unique here
-  #if(!unique(matrixData$feature)) {stop("There are duplicate values in the feature input. Please check and rerun this step again")}
-  
-  matrixData <- matrixData %>% as_tibble(rownames = "feature")
-  matrixData <- matrixData[, -1]
+  # matrixData <- overlap.df %>% dplyr::group_by(seqnames, peakStart, peakEnd, CB) %>% dplyr::summarise(count = n())
+  # 
+  # # generate the matrix format
+  # names(matrixData) <- c("chromosome","start","end","barcode","count")
+  # 
+  # matrixData <- matrixData %>%
+  #   unite("chrS", chromosome:start, sep=":") %>%
+  #   unite("feature", chrS:end, sep="-")
+  # 
+  # matrixData <- matrixData %>%
+  #   group_by(feature,barcode) %>%
+  #   mutate(grouped_id = row_number())
+  # 
+  # matrixData <- matrixData %>%
+  #   spread(barcode, count) %>%
+  #   dplyr::select(-grouped_id)
+  # 
+  # # TODO: sanity check to see if all features are unique here
+  # #if(!unique(matrixData$feature)) {stop("There are duplicate values in the feature input. Please check and rerun this step again")}
+  # 
+  # matrixData <- matrixData %>% as_tibble(rownames = "feature")
+  # matrixData <- matrixData[, -1]
   
   #TODO: Matrix format is not yet implemeted properly. Need to fix this
   #matrixData <- as.matrix(matrixData)
   #matrixData <- matrix(matrixData, dimnames = list(matrixData$feature, colnames(matrixData)))
   
   # call sc_atac_cell_callling.R here ... still ongoing
+  sc_atac_cell_calling(mat = as.matrix(matrixData), cell_calling = cell_calling, output_folder = output_folder)
   
   saveRDS(matrixData, file = paste(output_folder,"/feature_matrix.rds",sep = ""))
   cat("Feature matrix generated: ", paste(output_folder,"/feature_matrix.rds",sep = "") , "\n")
